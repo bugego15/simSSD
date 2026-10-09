@@ -38,6 +38,8 @@ static const cfg_field_t kFields[] = {
     { "pe_limit",   CFG_T_U32,   offsetof(ssd_config_t, pe_limit)          },
     { "ecc",        CFG_T_U32,   offsetof(ssd_config_t, ecc_bits_per_1kb)  },
     { "factory_bb", CFG_T_U32,   offsetof(ssd_config_t, factory_bb_permille) },
+    { "fault_inject", CFG_T_U32, offsetof(ssd_config_t, fault_inject)       },
+    { "fault_rate",   CFG_T_U32, offsetof(ssd_config_t, fault_rate_permille) },
     { "op",         CFG_T_U32,   offsetof(ssd_config_t, op_percent)        },
     { "seed",       CFG_T_U32,   offsetof(ssd_config_t, seed)              },
     { "log_level",  CFG_T_LEVEL, offsetof(ssd_config_t, log_level)         }
@@ -168,6 +170,10 @@ void ssd_config_set_defaults(ssd_config_t *cfg)
     cfg->pe_limit         = 3000u;
     cfg->ecc_bits_per_1kb = 60u;
     cfg->factory_bb_permille = 5u;      /* 0.5% */
+
+    /* 默认关闭故障注入：常规实验不应被随机故障污染 */
+    cfg->fault_inject        = 0u;
+    cfg->fault_rate_permille = 1u;      /* 开启时 0.1% */
 
     cfg->op_percent       = 7u;
 
@@ -384,6 +390,7 @@ void ssd_config_usage(const char *prog)
     printf("  --t_prog=N --t_read=N --t_bers=N --t_xfer=N\n");
     printf("reliability:\n");
     printf("  --pe_limit=N --ecc=N --factory_bb=N\n");
+    printf("  --fault_inject=N --fault_rate=N\n");
     printf("ftl:\n");
     printf("  --op=N\n");
     printf("run:\n");

@@ -33,6 +33,8 @@ typedef struct ssd_config {
     uint32_t pe_limit;          /* 标称 P/E 次数 */
     uint32_t ecc_bits_per_1kb;  /* ECC 纠错能力 */
     uint32_t factory_bb_permille; /* 出厂坏块比例，千分比 */
+    uint32_t fault_inject;        /* 0/1：是否注入随机故障 */
+    uint32_t fault_rate_permille; /* 单次操作故障概率，千分比 */
 
     /* ---------- FTL ---------- */
     uint32_t op_percent;        /* 过度供给 OP，百分比 */

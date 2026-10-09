@@ -125,9 +125,10 @@ static void test_clock_stats(void)
           ssd_stats_media_utilization() < 0.51);
 }
 
-int main(void)
+/* 返回失败项数量，由 tests/test_main.c 汇总 */
+int smoke_run(void)
 {
-    printf("[smoke] ssd-sim unit tests\n");
+    printf("[smoke] core lib tests\n");
 
     test_bitmap();
     test_mempool();
@@ -135,5 +136,5 @@ int main(void)
     test_clock_stats();
 
     printf("[smoke] %d checks, %d failed\n", g_checks, g_failed);
-    return (g_failed == 0) ? 0 : 1;
+    return g_failed;
 }

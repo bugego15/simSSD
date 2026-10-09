@@ -28,14 +28,20 @@ SRC_CORE := \
 	src/core/bitmap.c \
 	src/core/clock.c \
 	src/core/config.c \
+	src/core/eventq.c \
 	src/core/log.c \
 	src/core/mempool.c \
+	src/core/rng.c \
 	src/core/stats.c
 
-SRC_SIM  := src/main.c
-SRC_TEST := tests/test_smoke.c
+SRC_MEDIA := \
+	src/media/geometry.c \
+	src/media/nand.c
 
-OBJ_CORE := $(SRC_CORE:%.c=$(BUILD)/%.o)
+SRC_SIM  := src/main.c
+SRC_TEST := tests/test_main.c tests/test_smoke.c tests/test_media.c
+
+OBJ_LIB  := $(SRC_CORE:%.c=$(BUILD)/%.o) $(SRC_MEDIA:%.c=$(BUILD)/%.o)
 OBJ_SIM  := $(SRC_SIM:%.c=$(BUILD)/%.o)
 OBJ_TEST := $(SRC_TEST:%.c=$(BUILD)/%.o)
 
@@ -50,10 +56,10 @@ $(BUILD)/%.o: %.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INC) -c $< -o $@
 
-$(TARGET): $(OBJ_CORE) $(OBJ_SIM)
+$(TARGET): $(OBJ_LIB) $(OBJ_SIM)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDLIBS)
 
-$(TESTBIN): $(OBJ_CORE) $(OBJ_TEST)
+$(TESTBIN): $(OBJ_LIB) $(OBJ_TEST)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDLIBS)
 
 asan: CFLAGS := -std=c99 -Wall -Wextra -Werror -g -O1 \
@@ -67,4 +73,4 @@ test: $(TESTBIN)
 clean:
 	rm -rf $(BUILD)
 
--include $(OBJ_CORE:.o=.d) $(OBJ_SIM:.o=.d) $(OBJ_TEST:.o=.d)
+-include $(OBJ_LIB:.o=.d) $(OBJ_SIM:.o=.d) $(OBJ_TEST:.o=.d)
