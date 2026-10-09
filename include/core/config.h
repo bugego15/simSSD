@@ -41,6 +41,7 @@ typedef struct ssd_config {
 
     /* ---------- 运行 ---------- */
     uint32_t seed;
+    uint32_t bench_writes;      /* >0 时跑随机写基准（S2 验收用） */
     int      log_level;
 
     /* ---------- 派生量（由 ssd_config_derive 计算） ---------- */

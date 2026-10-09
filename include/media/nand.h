@@ -156,8 +156,17 @@ uint32_t nand_block_invalid_pages(const nand_dev_t *dev, pbn_t pbn);
 uint32_t nand_block_next_page(const nand_dev_t *dev, pbn_t pbn);
 uint16_t nand_page_state(const nand_dev_t *dev, ppn_t ppn);
 
-/* 元数据 CRC：由调用方构造 meta 后填充 */
-uint16_t nand_meta_crc(lba_t lba, uint32_t seq, uint16_t state);
+/* 元数据 CRC：只覆盖数据身份 (lba, seq)。
+ * 注意不要把 state 算进去 —— state 会随"页失效"被介质层改写，
+ * 若纳入 CRC，失效后的页再读就会出现假性校验失败。 */
+uint16_t nand_meta_crc(lba_t lba, uint32_t seq);
 void     nand_meta_seal(nand_page_meta_t *m);
+
+/* ---------------- 状态维护（由 FTL 层调用） ---------------- */
+
+/* 把某个有效页标记为失效：host 覆盖写旧页、TRIM、GC 搬移后都需要 */
+void     nand_invalidate_page(nand_dev_t *dev, ppn_t ppn);
+void     nand_set_block_state(nand_dev_t *dev, pbn_t pbn, uint16_t state);
+void     nand_set_block_next_page(nand_dev_t *dev, pbn_t pbn, uint32_t next);
 
 #endif /* SSD_MEDIA_NAND_H */

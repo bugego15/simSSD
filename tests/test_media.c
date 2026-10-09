@@ -108,7 +108,7 @@ static void test_prog_read_timing(void)
     CHECK(r.lba == 7u);
     CHECK(r.seq == 1u);
     CHECK(r.state == (uint16_t)NAND_PAGE_VALID);
-    CHECK(nand_meta_crc(r.lba, r.seq, r.state) == r.crc);
+    CHECK(nand_meta_crc(r.lba, r.seq) == r.crc);
 
     /* 读：t_xfer + t_read */
     t0 = ssd_clock_now();

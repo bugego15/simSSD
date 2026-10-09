@@ -38,10 +38,14 @@ SRC_MEDIA := \
 	src/media/geometry.c \
 	src/media/nand.c
 
-SRC_SIM  := src/main.c
-SRC_TEST := tests/test_main.c tests/test_smoke.c tests/test_media.c
+SRC_FTL := \
+	src/ftl/ftl.c \
+	src/ftl/gc.c
 
-OBJ_LIB  := $(SRC_CORE:%.c=$(BUILD)/%.o) $(SRC_MEDIA:%.c=$(BUILD)/%.o)
+SRC_SIM  := src/main.c
+SRC_TEST := tests/test_main.c tests/test_smoke.c tests/test_media.c tests/test_ftl.c
+
+OBJ_LIB  := $(SRC_CORE:%.c=$(BUILD)/%.o) $(SRC_MEDIA:%.c=$(BUILD)/%.o) $(SRC_FTL:%.c=$(BUILD)/%.o)
 OBJ_SIM  := $(SRC_SIM:%.c=$(BUILD)/%.o)
 OBJ_TEST := $(SRC_TEST:%.c=$(BUILD)/%.o)
 

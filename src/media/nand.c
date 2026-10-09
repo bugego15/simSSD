@@ -27,13 +27,12 @@ static uint32_t fnv_update(uint32_t h, const void *buf, size_t len)
     return h;
 }
 
-uint16_t nand_meta_crc(lba_t lba, uint32_t seq, uint16_t state)
+uint16_t nand_meta_crc(lba_t lba, uint32_t seq)
 {
     uint32_t h = FNV_OFFSET;
 
     h = fnv_update(h, &lba, sizeof(lba));
     h = fnv_update(h, &seq, sizeof(seq));
-    h = fnv_update(h, &state, sizeof(state));
     return (uint16_t)((h ^ (h >> 16)) & 0xFFFFu);
 }
 
@@ -42,7 +41,7 @@ void nand_meta_seal(nand_page_meta_t *m)
     if (m == NULL) {
         return;
     }
-    m->crc = nand_meta_crc(m->lba, m->seq, m->state);
+    m->crc = nand_meta_crc(m->lba, m->seq);
 }
 
 /* ------------------------------------------------------------------ */
@@ -112,7 +111,7 @@ static void nand_op_complete(void *arg)
             status = SSD_ERR_UECC;
         } else if (meta->state != (uint16_t)NAND_PAGE_FREE) {
             /* 已写过的页必须能通过 CRC 自检，否则说明元数据被写坏了 */
-            if (nand_meta_crc(meta->lba, meta->seq, meta->state) != meta->crc) {
+            if (nand_meta_crc(meta->lba, meta->seq) != meta->crc) {
                 status = SSD_ERR_UECC;
                 SSD_ERR("meta crc mismatch: ppn=%llu", (unsigned long long)op->ppn);
             }
@@ -557,4 +556,44 @@ uint16_t nand_page_state(const nand_dev_t *dev, ppn_t ppn)
     SSD_ASSERT(dev != NULL);
     SSD_ASSERT(ppn < dev->geo.total_pages);
     return dev->pages[ppn].state;
+}
+
+/* ------------------------------------------------------------------ */
+/* 状态维护：由 FTL 层驱动                                             */
+/* ------------------------------------------------------------------ */
+
+void nand_invalidate_page(nand_dev_t *dev, ppn_t ppn)
+{
+    nand_block_info_t *bi;
+    pbn_t pbn;
+
+    SSD_ASSERT(dev != NULL);
+    SSD_ASSERT(ppn < dev->geo.total_pages);
+
+    if (dev->pages[ppn].state != (uint16_t)NAND_PAGE_VALID) {
+        return;   /* 已失效或未写过，幂等 */
+    }
+    dev->pages[ppn].state = (uint16_t)NAND_PAGE_INVALID;
+
+    pbn = nand_geo_pbn_of_ppn(&dev->geo, ppn);
+    bi  = &dev->blocks[pbn];
+    if (bi->valid_pages > 0u) {
+        bi->valid_pages--;
+    }
+    bi->invalid_pages++;
+}
+
+void nand_set_block_state(nand_dev_t *dev, pbn_t pbn, uint16_t state)
+{
+    SSD_ASSERT(dev != NULL);
+    SSD_ASSERT(pbn < dev->geo.total_blocks);
+    dev->blocks[pbn].state = state;
+}
+
+void nand_set_block_next_page(nand_dev_t *dev, pbn_t pbn, uint32_t next)
+{
+    SSD_ASSERT(dev != NULL);
+    SSD_ASSERT(pbn < dev->geo.total_blocks);
+    SSD_ASSERT(next <= dev->geo.pages_per_block);
+    dev->blocks[pbn].next_page = next;
 }

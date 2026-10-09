@@ -42,6 +42,7 @@ static const cfg_field_t kFields[] = {
     { "fault_rate",   CFG_T_U32, offsetof(ssd_config_t, fault_rate_permille) },
     { "op",         CFG_T_U32,   offsetof(ssd_config_t, op_percent)        },
     { "seed",       CFG_T_U32,   offsetof(ssd_config_t, seed)              },
+    { "bench",      CFG_T_U32,   offsetof(ssd_config_t, bench_writes)      },
     { "log_level",  CFG_T_LEVEL, offsetof(ssd_config_t, log_level)         }
 };
 
@@ -178,6 +179,7 @@ void ssd_config_set_defaults(ssd_config_t *cfg)
     cfg->op_percent       = 7u;
 
     cfg->seed             = 1u;
+    cfg->bench_writes     = 0u;      /* 默认不跑基准 */
     cfg->log_level        = SSD_LOG_INFO;
 
     cfg->total_planes     = 0;
@@ -391,6 +393,8 @@ void ssd_config_usage(const char *prog)
     printf("reliability:\n");
     printf("  --pe_limit=N --ecc=N --factory_bb=N\n");
     printf("  --fault_inject=N --fault_rate=N\n");
+    printf("run:\n");
+    printf("  --seed=N --log_level=N --bench=N   (bench: 随机写 N 次后全量校验)\n");
     printf("ftl:\n");
     printf("  --op=N\n");
     printf("run:\n");
