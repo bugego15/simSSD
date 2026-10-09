@@ -39,9 +39,20 @@ typedef struct ssd_config {
     /* ---------- FTL ---------- */
     uint32_t op_percent;        /* 过度供给 OP，百分比 */
 
+    /* S3：回收与磨损策略 */
+    uint32_t gc_policy;         /* 0=greedy(最少有效页) 1=cost-benefit(收益/代价) */
+    uint32_t bg_gc_percent;     /* 后台 GC 目标水位：空闲块占总块百分比 */
+    uint32_t wl_enable;         /* 0/1 磨损均衡（destination 选低 PE 块 + 静态迁移） */
+    uint32_t wl_pe_thresh;      /* 触发静态 WL 的 max_pe - min_pe 阈值 */
+
+    /* S3：负载模型（bench 用） */
+    uint32_t workload;          /* 0=uniform 随机，1=hotspot 冷热混合 */
+    uint32_t hot_percent;       /* hotspot: 落在热区的访问占比 */
+    uint32_t trim_ratio;        /* bench: 每 N 次写之后发一次 TRIM（0=不发） */
+
     /* ---------- 运行 ---------- */
     uint32_t seed;
-    uint32_t bench_writes;      /* >0 时跑随机写基准（S2 验收用） */
+    uint32_t bench_writes;      /* >0 时跑随机写基准 */
     int      log_level;
 
     /* ---------- 派生量（由 ssd_config_derive 计算） ---------- */

@@ -7,6 +7,7 @@
 int smoke_run(void);
 int media_run(void);
 int ftl_run(void);
+int ftl_s3_run(void);
 
 int main(void)
 {
@@ -17,6 +18,7 @@ int main(void)
     failed += smoke_run();
     failed += media_run();
     failed += ftl_run();
+    failed += ftl_s3_run();
 
     printf("====================================================\n");
     if (failed != 0) {

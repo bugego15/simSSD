@@ -56,6 +56,13 @@ typedef struct nand_block_info {
     uint32_t next_page;     /* 写指针：本 block 内下一个可写页偏移 */
     uint32_t valid_pages;
     uint32_t invalid_pages;
+
+    /* 时间戳（虚拟时钟，ns）：GC 的冷热判定与 WL 都要用。
+     * last_prog_ns    —— 最后一次页编程完成时刻，代表"块有多新"
+     * last_invalid_ns —— 最后一次页失效时刻，代表"多久没产生新垃圾"
+     * cost-benefit 用二者的差值近似"块里的数据有多冷"。 */
+    uint64_t last_prog_ns;
+    uint64_t last_invalid_ns;
 } nand_block_info_t;
 
 /* ---------------- 完成回调 ---------------- */
@@ -155,6 +162,8 @@ uint32_t nand_block_valid_pages(const nand_dev_t *dev, pbn_t pbn);
 uint32_t nand_block_invalid_pages(const nand_dev_t *dev, pbn_t pbn);
 uint32_t nand_block_next_page(const nand_dev_t *dev, pbn_t pbn);
 uint16_t nand_page_state(const nand_dev_t *dev, ppn_t ppn);
+uint64_t nand_block_last_prog_ns(const nand_dev_t *dev, pbn_t pbn);
+uint64_t nand_block_last_invalid_ns(const nand_dev_t *dev, pbn_t pbn);
 
 /* 元数据 CRC：只覆盖数据身份 (lba, seq)。
  * 注意不要把 state 算进去 —— state 会随"页失效"被介质层改写，

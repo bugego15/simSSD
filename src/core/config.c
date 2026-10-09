@@ -41,6 +41,13 @@ static const cfg_field_t kFields[] = {
     { "fault_inject", CFG_T_U32, offsetof(ssd_config_t, fault_inject)       },
     { "fault_rate",   CFG_T_U32, offsetof(ssd_config_t, fault_rate_permille) },
     { "op",         CFG_T_U32,   offsetof(ssd_config_t, op_percent)        },
+    { "gc_policy",  CFG_T_U32,   offsetof(ssd_config_t, gc_policy)         },
+    { "bg_gc",      CFG_T_U32,   offsetof(ssd_config_t, bg_gc_percent)     },
+    { "wl",         CFG_T_U32,   offsetof(ssd_config_t, wl_enable)         },
+    { "wl_pe_thresh", CFG_T_U32, offsetof(ssd_config_t, wl_pe_thresh)      },
+    { "workload",   CFG_T_U32,   offsetof(ssd_config_t, workload)          },
+    { "hot_percent", CFG_T_U32,  offsetof(ssd_config_t, hot_percent)       },
+    { "trim_ratio", CFG_T_U32,   offsetof(ssd_config_t, trim_ratio)        },
     { "seed",       CFG_T_U32,   offsetof(ssd_config_t, seed)              },
     { "bench",      CFG_T_U32,   offsetof(ssd_config_t, bench_writes)      },
     { "log_level",  CFG_T_LEVEL, offsetof(ssd_config_t, log_level)         }
@@ -177,6 +184,21 @@ void ssd_config_set_defaults(ssd_config_t *cfg)
     cfg->fault_rate_permille = 1u;      /* 开启时 0.1% */
 
     cfg->op_percent       = 7u;
+
+    /* --- S3：回收与磨损策略 --- */
+    cfg->gc_policy        = 0u;      /* greedy */
+    /* 后台 GC 默认关闭。
+     * 实测：在没有真正 idle 时段的情况下，"每次 host 写后补齐水位"等于持续 GC，
+     * 垃圾还没攒够就回收，WAF 从 3.08 涨到 3.87、IOPS 从 155 跌到 123。
+     * 后台 GC 的价值要用空闲带宽换延迟平稳，等 S4 有了 idle 检测再打开评估。 */
+    cfg->bg_gc_percent    = 0u;
+    cfg->wl_enable        = 1u;
+    cfg->wl_pe_thresh     = 30u;     /* max_pe - min_pe 超过 30 触发静态迁移 */
+
+    /* --- S3：负载模型 --- */
+    cfg->workload         = 0u;      /* uniform */
+    cfg->hot_percent      = 80u;     /* hotspot: 80% 访问打在 20% 地址上 */
+    cfg->trim_ratio       = 0u;      /* 不发 TRIM */
 
     cfg->seed             = 1u;
     cfg->bench_writes     = 0u;      /* 默认不跑基准 */
@@ -376,7 +398,15 @@ void ssd_config_dump(const ssd_config_t *c)
            c->t_prog_ns, c->t_read_ns, c->t_bers_ns, c->t_xfer_ns);
     printf("  reliability     pe_limit %u | ecc %u bit/1KB | factory_bb %u/1000\n",
            c->pe_limit, c->ecc_bits_per_1kb, c->factory_bb_permille);
-    printf("  run             seed %u | log_level %d\n", c->seed, c->log_level);
+    printf("  gc policy       %s | bg_gc %u%% | wl %s (static thresh %u)\n",
+           (c->gc_policy == 1u) ? "cost-benefit" : "greedy",
+           c->bg_gc_percent,
+           c->wl_enable ? "on" : "off", c->wl_pe_thresh);
+    printf("  workload        %s | hot %u%% | trim_ratio %u\n",
+           (c->workload == 1u) ? "hotspot" : "uniform",
+           c->hot_percent, c->trim_ratio);
+    printf("  run             seed %u | log_level %d | fault %u\n",
+           c->seed, c->log_level, c->fault_inject);
     printf("================================================\n");
 }
 
@@ -395,6 +425,13 @@ void ssd_config_usage(const char *prog)
     printf("  --fault_inject=N --fault_rate=N\n");
     printf("run:\n");
     printf("  --seed=N --log_level=N --bench=N   (bench: 随机写 N 次后全量校验)\n");
+    printf("S3 ftl policy:\n");
+    printf("  --gc_policy=N    0=greedy 1=cost-benefit\n");
+    printf("  --bg_gc=N        后台 GC 目标水位（空闲块占总块百分比），0=关闭\n");
+    printf("  --wl=N --wl_pe_thresh=N   磨损均衡开关与静态迁移触发阈值\n");
+    printf("  --workload=N     0=uniform 1=hotspot（冷热混合）\n");
+    printf("  --hot_percent=N  hotspot 下落在热区的访问占比\n");
+    printf("  --trim_ratio=N   每 N 次写之后发一次 TRIM，0=不发\n");
     printf("ftl:\n");
     printf("  --op=N\n");
     printf("run:\n");

@@ -99,6 +99,7 @@ static void nand_op_complete(void *arg)
             meta->state = (uint16_t)NAND_PAGE_VALID;
             nand_meta_seal(meta);
             bi->valid_pages++;
+            bi->last_prog_ns = ssd_clock_now();
         }
         ssd_stats_inc(ST_NAND_PROG_PAGES);
         ssd_stats_add(ST_MEDIA_BUSY_NS, dev->t_prog);
@@ -106,7 +107,10 @@ static void nand_op_complete(void *arg)
 
     case NAND_OP_READ:
         meta = &dev->pages[op->ppn];
-        if (dev->fault_inject != 0u &&
+        /* 只有 fault_inject=2 才注入不可纠的读错误（UECC 必然丢数据）。
+         * fault_inject=1 只注入 program/erase 故障 —— 那是固件必须能自愈的
+         * 路径（重映射 + 坏块替换），用它来验收"坏块出现后不丢数据"。 */
+        if (dev->fault_inject == 2u &&
             ssd_rng_chance_permille(&dev->rng, dev->fault_rate_permille)) {
             status = SSD_ERR_UECC;
         } else if (meta->state != (uint16_t)NAND_PAGE_FREE) {
@@ -140,6 +144,8 @@ static void nand_op_complete(void *arg)
             bi->next_page     = 0u;
             bi->valid_pages   = 0u;
             bi->invalid_pages = 0u;
+            bi->last_prog_ns    = 0u;
+            bi->last_invalid_ns = 0u;
 
             /* P/E 次数越界后，擦除失败概率上升 -> 运行时坏块 */
             if (dev->fault_inject != 0u &&
@@ -558,6 +564,20 @@ uint16_t nand_page_state(const nand_dev_t *dev, ppn_t ppn)
     return dev->pages[ppn].state;
 }
 
+uint64_t nand_block_last_prog_ns(const nand_dev_t *dev, pbn_t pbn)
+{
+    SSD_ASSERT(dev != NULL);
+    SSD_ASSERT(pbn < dev->geo.total_blocks);
+    return dev->blocks[pbn].last_prog_ns;
+}
+
+uint64_t nand_block_last_invalid_ns(const nand_dev_t *dev, pbn_t pbn)
+{
+    SSD_ASSERT(dev != NULL);
+    SSD_ASSERT(pbn < dev->geo.total_blocks);
+    return dev->blocks[pbn].last_invalid_ns;
+}
+
 /* ------------------------------------------------------------------ */
 /* 状态维护：由 FTL 层驱动                                             */
 /* ------------------------------------------------------------------ */
@@ -581,6 +601,7 @@ void nand_invalidate_page(nand_dev_t *dev, ppn_t ppn)
         bi->valid_pages--;
     }
     bi->invalid_pages++;
+    bi->last_invalid_ns = ssd_clock_now();
 }
 
 void nand_set_block_state(nand_dev_t *dev, pbn_t pbn, uint16_t state)

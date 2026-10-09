@@ -40,10 +40,12 @@ SRC_MEDIA := \
 
 SRC_FTL := \
 	src/ftl/ftl.c \
-	src/ftl/gc.c
+	src/ftl/gc.c \
+	src/ftl/wl.c
 
 SRC_SIM  := src/main.c
-SRC_TEST := tests/test_main.c tests/test_smoke.c tests/test_media.c tests/test_ftl.c
+SRC_TEST := tests/test_main.c tests/test_smoke.c tests/test_media.c \
+	tests/test_ftl.c tests/test_ftl_s3.c
 
 OBJ_LIB  := $(SRC_CORE:%.c=$(BUILD)/%.o) $(SRC_MEDIA:%.c=$(BUILD)/%.o) $(SRC_FTL:%.c=$(BUILD)/%.o)
 OBJ_SIM  := $(SRC_SIM:%.c=$(BUILD)/%.o)
