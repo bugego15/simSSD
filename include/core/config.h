@@ -50,6 +50,23 @@ typedef struct ssd_config {
     uint32_t hot_percent;       /* hotspot: 落在热区的访问占比 */
     uint32_t trim_ratio;        /* bench: 每 N 次写之后发一次 TRIM（0=不发） */
 
+    /* S4：并发调度 */
+    uint32_t qdepth;            /* 闭环队列深度：同时挂在盘上的请求数 */
+    uint32_t read_ratio;        /* 读请求占比，千分比（0=纯写） */
+
+    /* S5：掉电恢复 */
+    uint32_t power_cut;         /* 每完成 N 个请求掉一次电（0=不掉电） */
+
+    /* S6：checkpoint（增量恢复） */
+    uint32_t cp_interval;       /* 每 N 次写下刷一次元数据快照，0=关闭 */
+
+    /* S6：superblock 条带写 */
+    uint32_t striping;          /* 1=按 superblock 分配 + 批量回收，0=S4 行为 */
+
+    /* S6：间歇型负载（给后台 GC 制造真实的空闲时段） */
+    uint32_t burst_len;         /* 每轮下发多少个请求后歇一会儿（0=闭环恒满） */
+    uint32_t idle_us;           /* 每轮之间的空闲时长（微秒） */
+
     /* ---------- 运行 ---------- */
     uint32_t seed;
     uint32_t bench_writes;      /* >0 时跑随机写基准 */

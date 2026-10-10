@@ -28,6 +28,11 @@ enum ssd_stat_id {
     ST_WL_MIGRATE_PAGES,
     ST_BADBLOCK_RUNTIME,
 
+    /* --- S5：掉电恢复 --- */
+    ST_SPOR_RECOVERIES, /* 上电重建次数 */
+    ST_SPOR_TORN_PAGES, /* 掉电撕裂的页数（半写的页） */
+    ST_SPOR_STALE_PAGES,/* 重建时判为旧版本/垃圾的页数 */
+
     /* --- 时间 --- */
     ST_MEDIA_BUSY_NS,   /* 介质处于忙状态的累计时间，用于算利用率 */
 

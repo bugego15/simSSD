@@ -20,6 +20,9 @@ static const char *const kStatName[ST_COUNT] = {
     "ftl.gc_copy_pages",
     "ftl.wl_migrate_pages",
     "ftl.badblock_runtime",
+    "spor.recoveries",
+    "spor.torn_pages",
+    "spor.stale_pages",
     "sim.media_busy_ns"
 };
 

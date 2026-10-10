@@ -124,3 +124,30 @@ uint32_t nand_geo_channel_of_ppn(const nand_geometry_t *g, ppn_t ppn)
 {
     return nand_geo_channel_of_pbn(g, nand_geo_pbn_of_ppn(g, ppn));
 }
+
+uint32_t nand_geo_ce_index_of_pbn(const nand_geometry_t *g, pbn_t pbn)
+{
+    uint32_t ch;
+    uint32_t rem;
+    uint32_t ce;
+
+    SSD_ASSERT(g != NULL);
+    SSD_ASSERT(pbn < g->total_blocks);
+
+    ch  = (uint32_t)(pbn / g->blocks_per_ch);
+    rem = (uint32_t)(pbn % g->blocks_per_ch);
+    ce  = rem / g->blocks_per_ce;
+
+    return ch * g->ces_per_ch + ce;
+}
+
+uint32_t nand_geo_ce_index_of_ppn(const nand_geometry_t *g, ppn_t ppn)
+{
+    return nand_geo_ce_index_of_pbn(g, nand_geo_pbn_of_ppn(g, ppn));
+}
+
+uint32_t nand_geo_ce_count(const nand_geometry_t *g)
+{
+    SSD_ASSERT(g != NULL);
+    return g->channels * g->ces_per_ch;
+}

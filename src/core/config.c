@@ -48,6 +48,13 @@ static const cfg_field_t kFields[] = {
     { "workload",   CFG_T_U32,   offsetof(ssd_config_t, workload)          },
     { "hot_percent", CFG_T_U32,  offsetof(ssd_config_t, hot_percent)       },
     { "trim_ratio", CFG_T_U32,   offsetof(ssd_config_t, trim_ratio)        },
+    { "qdepth",     CFG_T_U32,   offsetof(ssd_config_t, qdepth)            },
+    { "read_ratio", CFG_T_U32,   offsetof(ssd_config_t, read_ratio)        },
+    { "power_cut",  CFG_T_U32,   offsetof(ssd_config_t, power_cut)         },
+    { "cp_interval", CFG_T_U32,  offsetof(ssd_config_t, cp_interval)       },
+    { "striping",    CFG_T_U32,  offsetof(ssd_config_t, striping)          },
+    { "burst_len",   CFG_T_U32,  offsetof(ssd_config_t, burst_len)         },
+    { "idle_us",     CFG_T_U32,  offsetof(ssd_config_t, idle_us)           },
     { "seed",       CFG_T_U32,   offsetof(ssd_config_t, seed)              },
     { "bench",      CFG_T_U32,   offsetof(ssd_config_t, bench_writes)      },
     { "log_level",  CFG_T_LEVEL, offsetof(ssd_config_t, log_level)         }
@@ -187,10 +194,24 @@ void ssd_config_set_defaults(ssd_config_t *cfg)
 
     /* --- S3：回收与磨损策略 --- */
     cfg->gc_policy        = 0u;      /* greedy */
-    /* 后台 GC 默认关闭。
-     * 实测：在没有真正 idle 时段的情况下，"每次 host 写后补齐水位"等于持续 GC，
-     * 垃圾还没攒够就回收，WAF 从 3.08 涨到 3.87、IOPS 从 155 跌到 123。
-     * 后台 GC 的价值要用空闲带宽换延迟平稳，等 S4 有了 idle 检测再打开评估。 */
+    /*
+     * 后台 GC 默认关闭 —— 这是三轮实测的结论，不是保守。
+     *
+     * S3：没有真正 idle 时段时，"每次 host 写后补齐水位"等于持续 GC，
+     *     垃圾还没攒够就回收，WAF 3.08 -> 3.87、IOPS 155 -> 123。
+     * S4：补上 idle 检测后重测，闭环负载下队列恒满，bg_gc=10 与 0 完全一致
+     *     —— 因为压根没有空闲时段。
+     * S6：补上间歇型负载（--burst_len/--idle_us）后终于有了真 idle，
+     *     结果仍然是负收益（50 万请求、9% 空闲时间）：
+     *       bg_gc=0              IOPS 948  p99.9 119ms  前台 GC 1947 次
+     *       bg_gc=10             IOPS 927  p99.9 130ms  前台 GC 1515 次
+     *     空闲时段确实替 host 做了 435 次回收，但总耗时反而更长：
+     *     GC 的"读一批 -> 写一批"之间有数据依赖，独占盘时只能串行；
+     *     而 host 忙时做前台 GC，它的读写能与 host 的请求在不同 CE 上重叠。
+     *     换句话说，"没人抢带宽"并不等于"干得更快"。
+     *     附带一条：后台会把最划算的 victim（有效页最少的块）提前收走，
+     *     留给前台的都是硬骨头，前台单次停顿因此变长。
+     */
     cfg->bg_gc_percent    = 0u;
     cfg->wl_enable        = 1u;
     cfg->wl_pe_thresh     = 30u;     /* max_pe - min_pe 超过 30 触发静态迁移 */
@@ -199,6 +220,34 @@ void ssd_config_set_defaults(ssd_config_t *cfg)
     cfg->workload         = 0u;      /* uniform */
     cfg->hot_percent      = 80u;     /* hotspot: 80% 访问打在 20% 地址上 */
     cfg->trim_ratio       = 0u;      /* 不发 TRIM */
+
+    /* --- S4：并发调度 --- */
+    cfg->qdepth           = 32u;     /* 闭环队列深度 */
+    cfg->read_ratio       = 0u;      /* 纯写负载 */
+
+    /* --- S5：掉电恢复 --- */
+    cfg->power_cut        = 0u;      /* 默认不掉电：常规实验不应被恢复过程污染 */
+
+    /* --- S6：checkpoint ---
+     * 默认开启，间隔 8192 次写。
+     * 这是一笔明码标价的交易：每次下刷要写 ~1MB 元数据（默认拓扑下约 0.12s），
+     * 换来的是上电只需扫"快照之后动过"的几十个块而不是全盘。
+     * 间隔越小恢复越快、host 侧开销越大 —— 两者都能在基准里量出来。 */
+    cfg->cp_interval      = 8192u;
+
+    /*
+     * S6：superblock 条带写 + 批量回收，默认开启。
+     * 它不改变"写哪个物理页"的正确性，只改变块怎么成组、回收怎么分批。
+     */
+    cfg->striping         = 1u;
+
+    /*
+     * S6：间歇型负载，默认关闭（burst_len=0 表示闭环恒满）。
+     * 只有在这种"忙一阵歇一阵"的负载下，后台 GC 才有真正的 idle 时段可用 ——
+     * 闭环负载下队列永远是满的，bg_gc 开与不开跑出来的数字完全一样。
+     */
+    cfg->burst_len        = 0u;
+    cfg->idle_us          = 200u;
 
     cfg->seed             = 1u;
     cfg->bench_writes     = 0u;      /* 默认不跑基准 */
@@ -405,6 +454,12 @@ void ssd_config_dump(const ssd_config_t *c)
     printf("  workload        %s | hot %u%% | trim_ratio %u\n",
            (c->workload == 1u) ? "hotspot" : "uniform",
            c->hot_percent, c->trim_ratio);
+    printf("  concurrent      qdepth %u | read %u/1000\n",
+           c->qdepth, c->read_ratio);
+    printf("  spor            power_cut every %u requests (0=off)\n",
+           c->power_cut);
+    printf("  checkpoint      every %u writes (0=off, recover by full scan)\n",
+           c->cp_interval);
     printf("  run             seed %u | log_level %d | fault %u\n",
            c->seed, c->log_level, c->fault_inject);
     printf("================================================\n");
@@ -432,6 +487,18 @@ void ssd_config_usage(const char *prog)
     printf("  --workload=N     0=uniform 1=hotspot（冷热混合）\n");
     printf("  --hot_percent=N  hotspot 下落在热区的访问占比\n");
     printf("  --trim_ratio=N   每 N 次写之后发一次 TRIM，0=不发\n");
+    printf("S4 concurrency:\n");
+    printf("  --qdepth=N       闭环队列深度：同时挂在盘上的请求数（默认 32）\n");
+    printf("  --read_ratio=N   读请求占比，千分比（默认 0，纯写）\n");
+    printf("S5 power-loss recovery (SPOR):\n");
+    printf("  --power_cut=N    每完成 N 个请求掉一次电并上电重建，0=不掉电\n");
+    printf("S6 checkpoint (faster SPOR):\n");
+    printf("  --cp_interval=N  每 N 次写下刷一次元数据快照，0=关闭（上电全盘扫）\n");
+    printf("S6 superblock striping:\n");
+    printf("  --striping=N     1=按 superblock 分配 + 后台批量回收（默认），0=S4 行为\n");
+    printf("S6 bursty workload (给后台 GC 制造空闲时段):\n");
+    printf("  --burst_len=N    每轮下发 N 个请求后歇一会儿，0=闭环恒满（默认）\n");
+    printf("  --idle_us=N      每轮之间的空闲时长（微秒）\n");
     printf("ftl:\n");
     printf("  --op=N\n");
     printf("run:\n");

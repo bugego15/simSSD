@@ -58,6 +58,7 @@ int ftl_wl_static_once(ftl_dev_t *f)
     uint32_t dest_wp;
     bool reused_open;
     uint32_t copied = 0u;
+    uint32_t lost = 0u;
     pbn_t pbn;
     int rc;
 
@@ -95,10 +96,17 @@ int ftl_wl_static_once(ftl_dev_t *f)
     reused_open = false;
     nand_set_block_state(nd, dest, (uint16_t)NAND_BLK_OPEN);
 
-    rc = ftl_move_valid_pages(f, cold, &dest, &dest_wp, &reused_open, &copied);
+    rc = ftl_move_valid_pages(f, cold, &dest, &dest_wp, &reused_open,
+                              &copied, &lost);
     ftl_release_dest(f, dest, dest_wp, reused_open);
     if (rc != SSD_OK) {
         return rc;
+    }
+    if (lost != 0u) {
+        /* 与 GC 同理：还有页留在 cold 里，擦掉就是丢数据 */
+        SSD_ERR("wl: abort, %u page(s) still in pbn=%llu",
+                (unsigned)lost, (unsigned long long)cold);
+        return SSD_ERR_IO;
     }
 
     rc = nand_erase_sync(nd, cold);

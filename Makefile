@@ -29,6 +29,7 @@ SRC_CORE := \
 	src/core/clock.c \
 	src/core/config.c \
 	src/core/eventq.c \
+	src/core/latency.c \
 	src/core/log.c \
 	src/core/mempool.c \
 	src/core/rng.c \
@@ -41,11 +42,14 @@ SRC_MEDIA := \
 SRC_FTL := \
 	src/ftl/ftl.c \
 	src/ftl/gc.c \
-	src/ftl/wl.c
+	src/ftl/wl.c \
+	src/ftl/sched.c \
+	src/ftl/recovery.c
 
 SRC_SIM  := src/main.c
 SRC_TEST := tests/test_main.c tests/test_smoke.c tests/test_media.c \
-	tests/test_ftl.c tests/test_ftl_s3.c
+	tests/test_ftl.c tests/test_ftl_s3.c tests/test_sched.c tests/test_spor.c \
+	tests/test_s6.c
 
 OBJ_LIB  := $(SRC_CORE:%.c=$(BUILD)/%.o) $(SRC_MEDIA:%.c=$(BUILD)/%.o) $(SRC_FTL:%.c=$(BUILD)/%.o)
 OBJ_SIM  := $(SRC_SIM:%.c=$(BUILD)/%.o)

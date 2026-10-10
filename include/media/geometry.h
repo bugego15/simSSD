@@ -58,4 +58,11 @@ pbn_t    nand_geo_pbn_of_ppn(const nand_geometry_t *g, ppn_t ppn);
 uint32_t nand_geo_channel_of_pbn(const nand_geometry_t *g, pbn_t pbn);
 uint32_t nand_geo_channel_of_ppn(const nand_geometry_t *g, ppn_t ppn);
 
+/* 全局 CE 索引 = channel * ces_per_ch + ce（S4 用于 CE 级排程）。
+ * CE 是并发的基本单位：不同 CE 上的操作可以真正同时进行，
+ * 同一个 CE 上则必须串行 —— 介质层靠它决定操作何时开始。 */
+uint32_t nand_geo_ce_index_of_pbn(const nand_geometry_t *g, pbn_t pbn);
+uint32_t nand_geo_ce_index_of_ppn(const nand_geometry_t *g, ppn_t ppn);
+uint32_t nand_geo_ce_count(const nand_geometry_t *g);
+
 #endif /* SSD_MEDIA_GEOMETRY_H */
